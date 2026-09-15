@@ -291,12 +291,14 @@ export default {
   setMeta: `${webAPI}/document/set_meta`,
   getDatasetFilter: (datasetId: string) =>
     `${restAPIv1}/datasets/${datasetId}/documents?type=filter`,
-  // document permission (ACL)
+  // document permission (ACL) + app users/groups
   documentPermission: (datasetId: string, documentId: string) =>
     `${restAPIv1}/datasets/${datasetId}/documents/${documentId}/permission`,
-  groups: `${restAPIv1}/groups`,
-  groupDetail: (groupId: string) => `${restAPIv1}/groups/${groupId}`,
-  groupMembers: (groupId: string) => `${restAPIv1}/groups/${groupId}/members`,
+  appUsers: `${restAPIv1}/app-users`,
+  appUserDetail: (userId: string) => `${restAPIv1}/app-users/${userId}`,
+  appGroups: `${restAPIv1}/app-groups`,
+  appGroupDetail: (groupId: string) => `${restAPIv1}/app-groups/${groupId}`,
+  appGroupMembers: (groupId: string) => `${restAPIv1}/app-groups/${groupId}/members`,
 
   // chat
   createChat: `${restAPIv1}/chats`,

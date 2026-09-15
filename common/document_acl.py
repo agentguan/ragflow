@@ -20,35 +20,36 @@ import contextvars
 # API layer (which computes the values) and the retrieval layer (which consumes
 # them) can import it without pulling the api package into the rag search path.
 #
-# ``_acl_user_id`` identifies the authenticated user of the current request.
-# ``_acl_denied_doc_ids`` is the pre-computed set of document ids this user is
-# *denied* from reading (documents that have document_acl rows but none granting
-# the user, directly or via a group). It is a ``frozenset``; ``None``/empty means
-# "no restriction / not authenticated".
+# ``_acl_deny_all`` forces the retrieval layer to return nothing; it is set when
+# an ``X-App-User-Id`` header is present but does not resolve to a valid app
+# user of the authenticated tenant.
+# ``_acl_denied_doc_ids`` is the pre-computed set of document ids the current
+# app user is *denied* from reading (documents that have document_acl rows but
+# none granting the app user, directly or via a group). ``None``/empty means "no
+# restriction" (RAGFlow administrator session).
 # ``_acl_denied_kb_ids`` is the set of knowledge base ids that contain at least
 # one denied document; knowledge-graph retrieval (whose rows are KB-scoped, not
-# document-scoped) uses it to suppress KB-wide graph summaries that could leak
-# denied content.
+# document-scoped) uses it to suppress KB-wide graph summaries.
 
-_acl_user_id: contextvars.ContextVar = contextvars.ContextVar("ragflow_acl_user_id", default=None)
+_acl_deny_all: contextvars.ContextVar = contextvars.ContextVar("ragflow_acl_deny_all", default=False)
 _acl_denied_doc_ids: contextvars.ContextVar = contextvars.ContextVar("ragflow_acl_denied_doc_ids", default=None)
 _acl_denied_kb_ids: contextvars.ContextVar = contextvars.ContextVar("ragflow_acl_denied_kb_ids", default=None)
 
 
-def set_acl_context(user_id: str | None, denied_doc_ids: frozenset | None, denied_kb_ids: frozenset | None = None) -> None:
-    _acl_user_id.set(user_id)
+def set_acl_context(deny_all: bool = False, denied_doc_ids: frozenset | None = None, denied_kb_ids: frozenset | None = None) -> None:
+    _acl_deny_all.set(deny_all)
     _acl_denied_doc_ids.set(denied_doc_ids)
     _acl_denied_kb_ids.set(denied_kb_ids)
 
 
 def reset_acl_context() -> None:
-    _acl_user_id.set(None)
+    _acl_deny_all.set(False)
     _acl_denied_doc_ids.set(None)
     _acl_denied_kb_ids.set(None)
 
 
-def get_acl_user_id() -> str | None:
-    return _acl_user_id.get()
+def get_acl_deny_all() -> bool:
+    return _acl_deny_all.get()
 
 
 def get_acl_denied_doc_ids() -> frozenset | None:

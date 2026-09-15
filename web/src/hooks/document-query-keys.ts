@@ -29,8 +29,12 @@ export const enum DocumentApiAction {
   ParseDocument = 'parseDocument',
   FetchDocumentPermission = 'fetchDocumentPermission',
   SetDocumentPermission = 'setDocumentPermission',
-  FetchDocumentGroups = 'fetchDocumentGroups',
-  CreateDocumentGroup = 'createDocumentGroup',
+  FetchAppUsers = 'fetchAppUsers',
+  CreateAppUser = 'createAppUser',
+  DeleteAppUser = 'deleteAppUser',
+  FetchAppGroups = 'fetchAppGroups',
+  CreateAppGroup = 'createAppGroup',
+  DeleteAppGroup = 'deleteAppGroup',
 }
 
 export const DocumentKeys = {
@@ -51,6 +55,11 @@ export const DocumentPermissionKeys = {
     [DocumentApiAction.FetchDocumentPermission, datasetId, documentId] as const,
 };
 
-export const DocumentGroupKeys = {
-  all: () => [DocumentApiAction.FetchDocumentGroups] as const,
+export const AppUserKeys = {
+  all: () => [DocumentApiAction.FetchAppUsers] as const,
+};
+
+export const AppGroupKeys = {
+  all: () => [DocumentApiAction.FetchAppGroups] as const,
+  detail: (groupId: string) => [DocumentApiAction.FetchAppGroups, groupId] as const,
 };

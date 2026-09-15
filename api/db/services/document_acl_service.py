@@ -17,10 +17,18 @@
 import logging
 
 from api.db import UserTenantRole
-from api.db.db_models import DB, Document, DocumentACL, Knowledgebase, UserGroup, UserGroupMember, UserTenant
+from api.db.db_models import (
+    DB,
+    AppUser,
+    AppUserGroup,
+    AppUserGroupMember,
+    Document,
+    DocumentACL,
+    Knowledgebase,
+    UserTenant,
+)
 from api.db.services.common_service import CommonService
 from api.db.services.knowledgebase_service import KnowledgebaseService
-from api.db.services.user_service import UserService
 from common.misc_utils import get_uuid
 
 
@@ -33,6 +41,18 @@ class DocumentAclPrincipalType:
 class DocumentAclPermission:
     READ = "read"
     VALID = {READ}
+
+
+class AppUserService(CommonService):
+    model = AppUser
+
+
+class AppUserGroupService(CommonService):
+    model = AppUserGroup
+
+
+class AppUserGroupMemberService(CommonService):
+    model = AppUserGroupMember
 
 
 class DocumentAclService(CommonService):
@@ -53,13 +73,13 @@ class DocumentAclService(CommonService):
                 "email": "",
             }
             if r.principal_type == DocumentAclPrincipalType.USER:
-                users = list(UserService.query(id=r.principal_id))
+                users = list(AppUserService.query(id=r.principal_id))
                 if users:
                     u = users[0]
-                    entry["name"] = u.nickname or u.email or r.principal_id
+                    entry["name"] = u.name or r.principal_id
                     entry["email"] = u.email or ""
             else:
-                groups = list(UserGroupService.query(id=r.principal_id))
+                groups = list(AppUserGroupService.query(id=r.principal_id))
                 if groups:
                     entry["name"] = groups[0].name or r.principal_id
             result.append(entry)
@@ -70,7 +90,7 @@ class DocumentAclService(CommonService):
     def replace_principals(cls, document_id: str, principals: list[dict], tenant_id: str, created_by: str) -> None:
         """Atomically replace the ACL entries of a document.
 
-        ``principals`` is a list of ``{"principal_type": "user"|"group", "principal_id": "<id>"}``.
+        ``principals`` is a list of ``{"principal_type": "user"|"group", "principal_id": "<AppUser.id|AppUserGroup.id>"}``.
         """
         with DB.atomic():
             cls.model.delete().where(cls.model.document_id == document_id).execute()
@@ -89,19 +109,40 @@ class DocumentAclService(CommonService):
                     created_by=created_by,
                 )
 
-
-class UserGroupService(CommonService):
-    model = UserGroup
+    @classmethod
+    @DB.connection_context()
+    def delete_app_user(cls, user_id: str) -> None:
+        """Delete an app user and any ACL/membership rows that reference it."""
+        with DB.atomic():
+            DocumentACL.delete().where(
+                (DocumentACL.principal_type == DocumentAclPrincipalType.USER)
+                & (DocumentACL.principal_id == user_id)
+            ).execute()
+            AppUserGroupMember.delete().where(AppUserGroupMember.user_id == user_id).execute()
+            AppUser.delete().where(AppUser.id == user_id).execute()
 
     @classmethod
     @DB.connection_context()
-    def list_with_member_count(cls, tenant_id: str) -> list[dict]:
-        groups = list(cls.query(tenant_id=tenant_id))
-        member_counts = {}
+    def delete_app_group(cls, group_id: str) -> None:
+        """Delete an app-user group and any ACL/membership rows that reference it."""
+        with DB.atomic():
+            DocumentACL.delete().where(
+                (DocumentACL.principal_type == DocumentAclPrincipalType.GROUP)
+                & (DocumentACL.principal_id == group_id)
+            ).execute()
+            AppUserGroupMember.delete().where(AppUserGroupMember.group_id == group_id).execute()
+            AppUserGroup.delete().where(AppUserGroup.id == group_id).execute()
+
+    @classmethod
+    @DB.connection_context()
+    def list_groups(cls, tenant_id: str) -> list[dict]:
+        """List app-user groups of a tenant enriched with member count."""
+        groups = list(AppUserGroupService.query(tenant_id=tenant_id))
+        member_counts: dict[str, int] = {}
         if groups:
             rows = list(
-                UserGroupMember.select(UserGroupMember.group_id).where(
-                    UserGroupMember.group_id.in_([g.id for g in groups])
+                AppUserGroupMember.select(AppUserGroupMember.group_id).where(
+                    AppUserGroupMember.group_id.in_([g.id for g in groups])
                 )
             )
             for row in rows:
@@ -119,28 +160,15 @@ class UserGroupService(CommonService):
 
     @classmethod
     @DB.connection_context()
-    def delete_group(cls, group_id: str) -> None:
-        with DB.atomic():
-            DocumentACL.delete().where(
-                (DocumentACL.principal_type == DocumentAclPrincipalType.GROUP) & (DocumentACL.principal_id == group_id)
-            ).execute()
-            UserGroupMember.delete().where(UserGroupMember.group_id == group_id).execute()
-            cls.model.delete().where(cls.model.id == group_id).execute()
-
-
-class UserGroupMemberService(CommonService):
-    model = UserGroupMember
-
-    @classmethod
-    @DB.connection_context()
     def list_members(cls, group_id: str) -> list[dict]:
+        """List app-user members of a group enriched with display names."""
         result = []
-        for r in list(cls.query(group_id=group_id)):
+        for r in list(AppUserGroupMemberService.query(group_id=group_id)):
             entry = {"group_id": r.group_id, "user_id": r.user_id, "name": r.user_id, "email": ""}
-            users = list(UserService.query(id=r.user_id))
+            users = list(AppUserService.query(id=r.user_id))
             if users:
                 u = users[0]
-                entry["name"] = u.nickname or u.email or r.user_id
+                entry["name"] = u.name or r.user_id
                 entry["email"] = u.email or ""
             result.append(entry)
         return result
@@ -148,38 +176,42 @@ class UserGroupMemberService(CommonService):
     @classmethod
     @DB.connection_context()
     def set_members(cls, group_id: str, user_ids: list[str]) -> None:
+        """Atomically replace the app-user membership of a group."""
         with DB.atomic():
-            cls.model.delete().where(cls.model.group_id == group_id).execute()
+            AppUserGroupMember.delete().where(AppUserGroupMember.group_id == group_id).execute()
             for uid in dict.fromkeys(user_ids):
-                cls.model.create(id=get_uuid(), group_id=group_id, user_id=str(uid))
+                AppUserGroupMember.create(id=get_uuid(), group_id=group_id, user_id=str(uid))
 
 
 @DB.connection_context()
-def get_user_group_ids(user_id: str) -> list[str]:
-    return [r.group_id for r in UserGroupMember.select(UserGroupMember.group_id).where(UserGroupMember.user_id == user_id)]
+def get_app_user_group_ids(app_user_id: str) -> list[str]:
+    return [
+        r.group_id
+        for r in AppUserGroupMember.select(AppUserGroupMember.group_id).where(
+            AppUserGroupMember.user_id == app_user_id
+        )
+    ]
 
 
 @DB.connection_context()
-def compute_denied_doc_ids(user_id: str) -> frozenset:
-    """Compute the set of document ids the user is denied from reading.
+def compute_app_user_denied_doc_ids(app_user_id: str) -> frozenset:
+    """Compute the document ids the app user is denied from reading.
 
     A document is denied when it has at least one ``document_acl`` row but none
-    of those rows grant the user (directly or through one of the user's groups).
-    Documents without any ACL row stay readable (the pre-ACL behaviour).
-
-    The document creator and the owning knowledge base's tenant owner always
-    retain read access, so restricting a document can never lock its own
-    author/owner out.
+    of those rows grant the app user (directly or through one of its groups).
+    Documents without any ACL row stay readable (the pre-ACL behaviour). Unlike
+    the RAGFlow ``User``, an app user is never the creator or owner of a
+    document, so no creator/owner exemption applies.
     """
     granted: set[str] = set()
     for r in DocumentACL.select(DocumentACL.document_id).where(
         DocumentACL.principal_type == DocumentAclPrincipalType.USER,
-        DocumentACL.principal_id == user_id,
+        DocumentACL.principal_id == app_user_id,
         DocumentACL.permission == DocumentAclPermission.READ,
     ):
         granted.add(r.document_id)
 
-    group_ids = get_user_group_ids(user_id)
+    group_ids = get_app_user_group_ids(app_user_id)
     if group_ids:
         for r in DocumentACL.select(DocumentACL.document_id).where(
             DocumentACL.principal_type == DocumentAclPrincipalType.GROUP,
@@ -192,34 +224,7 @@ def compute_denied_doc_ids(user_id: str) -> frozenset:
     for r in DocumentACL.select(DocumentACL.document_id).distinct():
         restricted.add(r.document_id)
 
-    denied = restricted - granted
-    if not denied:
-        return frozenset()
-
-    # Safety net: never deny the document creator or the owner of the document's
-    # knowledge base. This is a small bounded set (only restricted docs without
-    # an explicit grant to this user).
-    exempt: set[str] = set()
-    docs = list(Document.select(Document.id, Document.created_by, Document.kb_id).where(Document.id.in_(list(denied))))
-    kb_ids = set()
-    for d in docs:
-        if d.created_by == user_id:
-            exempt.add(d.id)
-        else:
-            kb_ids.add(d.kb_id)
-    if kb_ids:
-        owned_kb_ids = {
-            kb.id
-            for kb in Knowledgebase.select(Knowledgebase.id).where(
-                Knowledgebase.tenant_id == user_id,
-                Knowledgebase.id.in_(list(kb_ids)),
-            )
-        }
-        for d in docs:
-            if d.kb_id in owned_kb_ids:
-                exempt.add(d.id)
-
-    return frozenset(denied - exempt)
+    return frozenset(restricted - granted)
 
 
 @DB.connection_context()
@@ -234,8 +239,15 @@ def compute_denied_kb_ids(denied_doc_ids: frozenset | set) -> frozenset:
 
 
 @DB.connection_context()
+def get_app_user(tenant_id: str, app_user_id: str) -> AppUser | None:
+    """Fetch an app user scoped to ``tenant_id`` (``None`` when absent/mismatched)."""
+    users = list(AppUser.select().where(AppUser.id == app_user_id, AppUser.tenant_id == tenant_id))
+    return users[0] if users else None
+
+
+@DB.connection_context()
 def can_manage_document(document: dict | Document, user_id: str) -> bool:
-    """Whether ``user_id`` may manage (view/replace) the ACL of a document."""
+    """Whether ``user_id`` (a RAGFlow user) may manage the ACL of a document."""
     doc = document.to_dict() if isinstance(document, Document) else document
     if doc.get("created_by") == user_id:
         return True

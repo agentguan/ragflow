@@ -31,7 +31,7 @@ from common.tag_feature_utils import parse_tag_features
 from common import settings
 
 from common.misc_utils import thread_pool_exec
-from common.document_acl import get_acl_denied_doc_ids
+from common.document_acl import get_acl_denied_doc_ids, get_acl_deny_all
 
 
 def build_fusion_expr(topn: int, vector_similarity_weight: float = 0.3) -> FusionExpr:
@@ -705,10 +705,14 @@ class Dealer:
         if rerank_mdl is not None and page != 1:
             raise Exception(f"Pagination is not supported when rerank_mdl is specified. Please set page=1 to retrieve the top {page_size} results.")
 
-        # Document-level ACL enforcement. ``denied`` is request-scoped and
-        # computed by the API layer (``compute_denied_doc_ids``); empty/None
-        # means the caller is unauthenticated or no document is restricted, so
-        # retrieval keeps its original scope.
+        # Document-level ACL enforcement driven by the request-scoped context set
+        # by the API layer. ``deny_all`` means an app identity was supplied but is
+        # not valid for the authenticated tenant; ``denied`` is the set of document
+        # ids this app user may not read (empty/None = RAGFlow administrator, no
+        # restriction).
+        if get_acl_deny_all():
+            ranks["doc_aggs"] = []
+            return ranks
         denied = get_acl_denied_doc_ids()
         if denied:
             if doc_ids:

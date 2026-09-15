@@ -98,10 +98,25 @@ export interface IDocumentPermission {
   principals: IDocumentAclPrincipal[];
 }
 
-export interface IDocumentGroup {
+export interface IAppUser {
+  id: string;
+  tenant_id: string;
+  name: string;
+  email: string;
+  created_by: string;
+}
+
+export interface IAppUserGroup {
   id: string;
   tenant_id: string;
   name: string;
   created_by: string;
   member_count: number;
+}
+
+export interface IAppUserGroupMember {
+  group_id: string;
+  user_id: string;
+  name: string;
+  email: string;
 }

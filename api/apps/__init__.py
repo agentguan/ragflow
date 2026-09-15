@@ -25,7 +25,11 @@ from quart_cors import cors
 from common.constants import StatusEnum, RetCode
 from api.db.db_models import close_connection, APIToken
 from api.db.services import UserService
-from api.db.services.document_acl_service import compute_denied_doc_ids, compute_denied_kb_ids
+from api.db.services.document_acl_service import (
+    compute_app_user_denied_doc_ids,
+    compute_denied_kb_ids,
+    get_app_user,
+)
 from common.document_acl import reset_acl_context, set_acl_context
 from api.utils.json_encode import CustomJSONEncoder
 from api.utils import commands
@@ -422,28 +426,54 @@ async def handle_model_exception(error):
 
 @app.before_request
 async def _load_acl_context():
-    """Resolve the authenticated user and pre-compute their denied document ids.
+    """Resolve document ACL for the request and publish it for the retrieval layer.
 
-    The result is stored in a request-scoped :class:`contextvars.ContextVar`
-    (see ``common.document_acl``) so that the retrieval layer can enforce
-    document-level ACL without importing the API package. Unauthenticated paths
-    and requests interrupted by auth failures leave the context empty, which the
-    retrieval layer treats as "no restriction".
+    RAGFlow ``User`` records only manage knowledge bases; business end-users are
+    represented by ``AppUser`` records and identified at retrieval time by the
+    ``X-App-User-Id`` header. The per-request deny set is stored in a
+    request-scoped :class:`contextvars.ContextVar` (see ``common.document_acl``).
+
+    - ``X-App-User-Id`` present + resolves to an app user of the authenticated
+      tenant -> filter retrieval by that app user's accessible documents.
+    - ``X-App-User-Id`` present but missing/cross-tenant -> deny everything.
+    - no app identity -> a RAGFlow administrator keeps full access; unauthenticated
+      requests are rejected by ``@login_required`` before retrieval runs.
     """
     reset_acl_context()
     try:
         user = _load_user()
     except Exception:
         return
-    if user is None:
+
+    app_user_id = request.headers.get("X-App-User-Id")
+    if not app_user_id:
+        # RAGFlow administrator (or request never reaches retrieval).
+        set_acl_context(deny_all=False)
         return
+
+    if user is None:
+        set_acl_context(deny_all=True)
+        return
+
     try:
-        denied = compute_denied_doc_ids(user.id)
+        app_user = get_app_user(user.id, app_user_id)
+    except Exception:
+        logging.exception("Failed to resolve app user %s", app_user_id)
+        set_acl_context(deny_all=True)
+        return
+    if app_user is None:
+        set_acl_context(deny_all=True)
+        return
+
+    try:
+        denied = compute_app_user_denied_doc_ids(app_user.id)
         denied_kb_ids = compute_denied_kb_ids(denied) if denied else frozenset()
     except Exception:
-        logging.exception("Failed to compute document ACL deny set for user %s", user.id)
+        logging.exception("Failed to compute document ACL deny set for app user %s", app_user.id)
+        set_acl_context(deny_all=True)
         return
-    set_acl_context(user.id, denied, denied_kb_ids)
+
+    set_acl_context(deny_all=False, denied_doc_ids=denied, denied_kb_ids=denied_kb_ids)
 
 
 @app.teardown_request

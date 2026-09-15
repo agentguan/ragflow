@@ -24,7 +24,9 @@ import { IChunk } from '@/interfaces/database/dataset';
 import {
   IDocumentInfo,
   IDocumentInfoFilter,
-  IDocumentGroup,
+  IAppUser,
+  IAppUserGroup,
+  IAppUserGroupMember,
   IDocumentPermission,
 } from '@/interfaces/database/document';
 import {
@@ -43,16 +45,21 @@ import documentStructureService from '@/services/document-structure-service';
 import kbService, {
   changeDocumentParser,
   changeDocumentsStatus,
+  createAppGroup,
+  createAppUser,
   createDocument,
-  createGroup,
+  deleteAppGroup,
+  deleteAppUser,
   deleteDocument,
   documentFilter,
+  getAppGroup,
   getDocumentPermission,
+  listAppGroups,
+  listAppUsers,
   listDocument,
-  listGroups,
   renameDocument,
+  setAppGroupMembers,
   setDocumentPermission,
-  setGroupMembers,
   uploadDocument,
 } from '@/services/knowledge-service';
 import { restAPIv1 } from '@/utils/api';
@@ -83,8 +90,9 @@ import {
 } from './route-hook';
 import { KnowledgeApiAction } from './use-knowledge-request';
 import {
+  AppGroupKeys,
+  AppUserKeys,
   DocumentApiAction,
-  DocumentGroupKeys,
   DocumentKeys,
   DocumentPermissionKeys,
 } from './document-query-keys';
@@ -674,13 +682,13 @@ export const useSetDocumentPermission = () => {
   return { setDocumentPermission: mutateAsync, loading, data };
 };
 
-export const useFetchDocumentGroups = () => {
-  const { data, isFetching: loading, refetch } = useQuery<IDocumentGroup[]>({
-    queryKey: DocumentGroupKeys.all(),
+export const useFetchAppUsers = () => {
+  const { data, isFetching: loading, refetch } = useQuery<IAppUser[]>({
+    queryKey: AppUserKeys.all(),
     initialData: [],
     gcTime: 0,
     queryFn: async () => {
-      const { data } = await listGroups();
+      const { data } = await listAppUsers();
       return data?.data ?? [];
     },
   });
@@ -688,7 +696,7 @@ export const useFetchDocumentGroups = () => {
   return { data, loading, refetch };
 };
 
-export const useCreateDocumentGroup = () => {
+export const useCreateAppUser = () => {
   const queryClient = useQueryClient();
 
   const {
@@ -696,32 +704,142 @@ export const useCreateDocumentGroup = () => {
     isPending: loading,
     mutateAsync,
   } = useMutation({
-    mutationKey: [DocumentApiAction.CreateDocumentGroup],
-    mutationFn: async ({
-      name,
-      userIds,
-    }: {
-      name: string;
-      userIds: string[];
-    }) => {
-      const { data } = await createGroup({ name });
-      if (data.code !== 0) {
-        return { code: data.code, groupId: '' };
+    mutationKey: [DocumentApiAction.CreateAppUser],
+    mutationFn: async ({ name, email }: { name: string; email?: string }) => {
+      const { data } = await createAppUser({ name, email });
+      if (data.code === 0) {
+        message.success(i18n.t('message.created'));
+        queryClient.invalidateQueries({ queryKey: AppUserKeys.all() });
       }
-      const groupId: string = data.data?.id;
-      if (userIds.length > 0) {
-        const ret = await setGroupMembers(groupId, userIds);
-        if (ret.data?.code !== 0) {
-          return { code: ret.data.code as number, groupId };
-        }
-      }
-      message.success(i18n.t('message.created'));
-      queryClient.invalidateQueries({ queryKey: DocumentGroupKeys.all() });
-      return { code: 0, groupId };
+      return data.code;
     },
   });
 
-  return { createGroup: mutateAsync, loading, data };
+  return { createAppUser: mutateAsync, loading, data };
+};
+
+export const useDeleteAppUser = () => {
+  const queryClient = useQueryClient();
+
+  const {
+    data,
+    isPending: loading,
+    mutateAsync,
+  } = useMutation({
+    mutationKey: [DocumentApiAction.DeleteAppUser],
+    mutationFn: async (userId: string) => {
+      const { data } = await deleteAppUser(userId);
+      if (data.code === 0) {
+        message.success(i18n.t('message.deleted'));
+        queryClient.invalidateQueries({ queryKey: AppUserKeys.all() });
+      }
+      return data.code;
+    },
+  });
+
+  return { deleteAppUser: mutateAsync, loading, data };
+};
+
+export const useFetchAppGroups = () => {
+  const { data, isFetching: loading, refetch } = useQuery<IAppUserGroup[]>({
+    queryKey: AppGroupKeys.all(),
+    initialData: [],
+    gcTime: 0,
+    queryFn: async () => {
+      const { data } = await listAppGroups();
+      return data?.data ?? [];
+    },
+  });
+
+  return { data, loading, refetch };
+};
+
+export const useCreateAppGroup = () => {
+  const queryClient = useQueryClient();
+
+  const {
+    data,
+    isPending: loading,
+    mutateAsync,
+  } = useMutation({
+    mutationKey: [DocumentApiAction.CreateAppGroup],
+    mutationFn: async (name: string) => {
+      const { data } = await createAppGroup({ name });
+      if (data.code === 0) {
+        message.success(i18n.t('message.created'));
+        queryClient.invalidateQueries({ queryKey: AppGroupKeys.all() });
+      }
+      return data.code;
+    },
+  });
+
+  return { createAppGroup: mutateAsync, loading, data };
+};
+
+export const useDeleteAppGroup = () => {
+  const queryClient = useQueryClient();
+
+  const {
+    data,
+    isPending: loading,
+    mutateAsync,
+  } = useMutation({
+    mutationKey: [DocumentApiAction.DeleteAppGroup],
+    mutationFn: async (groupId: string) => {
+      const { data } = await deleteAppGroup(groupId);
+      if (data.code === 0) {
+        message.success(i18n.t('message.deleted'));
+        queryClient.invalidateQueries({ queryKey: AppGroupKeys.all() });
+      }
+      return data.code;
+    },
+  });
+
+  return { deleteAppGroup: mutateAsync, loading, data };
+};
+
+export const useFetchAppGroupMembers = (groupId?: string) => {
+  const { data, isFetching: loading } = useQuery<IAppUserGroupMember[]>({
+    queryKey: AppGroupKeys.detail(groupId!),
+    enabled: !!groupId,
+    initialData: [],
+    gcTime: 0,
+    queryFn: async () => {
+      const { data } = await getAppGroup(groupId!);
+      return data?.data?.members ?? [];
+    },
+  });
+
+  return { data, loading };
+};
+
+export const useSetAppGroupMembers = () => {
+  const queryClient = useQueryClient();
+
+  const {
+    data,
+    isPending: loading,
+    mutateAsync,
+  } = useMutation({
+    mutationKey: [DocumentApiAction.FetchAppGroups, 'setMembers'],
+    mutationFn: async ({
+      groupId,
+      userIds,
+    }: {
+      groupId: string;
+      userIds: string[];
+    }) => {
+      const { data } = await setAppGroupMembers(groupId, userIds);
+      if (data.code === 0) {
+        message.success(i18n.t('message.modified'));
+        queryClient.invalidateQueries({ queryKey: AppGroupKeys.detail(groupId) });
+        queryClient.invalidateQueries({ queryKey: AppGroupKeys.all() });
+      }
+      return data.code;
+    },
+  });
+
+  return { setAppGroupMembers: mutateAsync, loading, data };
 };
 
 /**

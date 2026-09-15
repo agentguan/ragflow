@@ -22,26 +22,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
-  useCreateDocumentGroup,
-  useFetchDocumentGroups,
+  useFetchAppGroups,
+  useFetchAppUsers,
   useFetchDocumentPermission,
 } from '@/hooks/use-document-request';
-import { useListTenantUser } from '@/hooks/use-user-setting-request';
 import {
   DocumentAclPrincipalType,
   IDocumentAclPrincipal,
 } from '@/interfaces/database/document';
 import { ISetDocumentPermissionRequestBody } from '@/interfaces/request/document';
-import {
-  ChangeEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface DocumentPermissionDialogProps {
@@ -66,17 +58,14 @@ export function DocumentPermissionDialog({
     datasetId,
     documentId,
   );
-  const { data: tenantUsers } = useListTenantUser();
-  const { data: groups, refetch: refetchGroups } = useFetchDocumentGroups();
-  const { createGroup, loading: creatingGroup } = useCreateDocumentGroup();
+  const { data: appUsers } = useFetchAppUsers();
+  const { data: appGroups } = useFetchAppGroups();
 
   const [originPrincipals, setOriginPrincipals] = useState<
     IDocumentAclPrincipal[]
   >([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupMemberIds, setNewGroupMemberIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (permission) {
@@ -95,35 +84,31 @@ export function DocumentPermissionDialog({
   }, [permission]);
 
   const userOptions = useMemo(
-    () =>
-      tenantUsers.map((u) => ({
-        label: u.nickname || u.email || u.user_id,
-        value: u.user_id,
-      })),
-    [tenantUsers],
+    () => appUsers.map((u) => ({ label: u.name, value: u.id })),
+    [appUsers],
   );
 
   const groupOptions = useMemo(
     () =>
-      groups.map((g) => ({
+      appGroups.map((g) => ({
         label: `${g.name} (${g.member_count})`,
         value: g.id,
       })),
-    [groups],
+    [appGroups],
   );
 
   const knownUserIds = useMemo(
-    () => new Set(tenantUsers.map((u) => u.user_id)),
-    [tenantUsers],
+    () => new Set(appUsers.map((u) => u.id)),
+    [appUsers],
   );
 
   const knownGroupIds = useMemo(
-    () => new Set(groups.map((g) => g.id)),
-    [groups],
+    () => new Set(appGroups.map((g) => g.id)),
+    [appGroups],
   );
 
   // Principals that are no longer present in the candidate lists (e.g. a
-  // deleted group) are preserved verbatim so saving never silently drops them.
+  // deleted app user/group) are preserved verbatim so saving never drops them.
   const orphanPrincipals = useMemo(
     () =>
       originPrincipals.filter((p) => {
@@ -152,29 +137,6 @@ export function DocumentPermissionDialog({
     ];
     onOk(next);
   }, [orphanPrincipals, selectedUserIds, selectedGroupIds, onOk]);
-
-  const handleCreateGroup = useCallback(async () => {
-    const name = newGroupName.trim();
-    if (!name) {
-      return;
-    }
-    const result = await createGroup({
-      name,
-      userIds: newGroupMemberIds,
-    });
-    if (result?.code === 0) {
-      setNewGroupName('');
-      setNewGroupMemberIds([]);
-      refetchGroups();
-    }
-  }, [createGroup, newGroupMemberIds, newGroupName, refetchGroups]);
-
-  const handleGroupNameChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      setNewGroupName(e.target.value);
-    },
-    [],
-  );
 
   const hasPrincipals =
     orphanPrincipals.length > 0 ||
@@ -217,38 +179,6 @@ export function DocumentPermissionDialog({
               maxCount={6}
               modalPopover
             />
-          </div>
-
-          <div className="space-y-2 rounded-md border border-border-button p-3">
-            <div className="text-sm font-medium">
-              {t('knowledgeDetails.permissionCreateGroup')}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Input
-                value={newGroupName}
-                onChange={handleGroupNameChange}
-                placeholder={t('knowledgeDetails.permissionGroupName')}
-                data-testid="group-name-input"
-              />
-              <MultiSelect
-                options={userOptions}
-                defaultValue={newGroupMemberIds}
-                onValueChange={setNewGroupMemberIds}
-                placeholder={t('knowledgeDetails.permissionGroupMembers')}
-                maxCount={6}
-                modalPopover
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!newGroupName.trim() || creatingGroup}
-                onClick={handleCreateGroup}
-                data-testid="group-create"
-                className="self-start"
-              >
-                {t('knowledgeDetails.permissionAddGroup')}
-              </Button>
-            </div>
           </div>
 
           {orphanPrincipals.length > 0 && (

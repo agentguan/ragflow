@@ -1348,11 +1348,12 @@ class Document(DataBaseModel):
 class DocumentACL(DataBaseModel):
     """Per-document access control list entry.
 
-    ``principal_type`` is ``user`` or ``group``; ``principal_id`` references a
-    ``User.id`` or ``UserGroup.id`` respectively. ``permission`` currently only
-    carries ``read``. A document with no rows in this table is readable by
-    everyone (the pre-ACL behaviour); a document with at least one row becomes
-    restricted to the principals listed on those rows.
+    ``principal_type`` is ``user`` or ``group``; ``principal_id`` references an
+    ``AppUser.id`` or ``AppUserGroup.id`` respectively (business end-users,
+    distinct from the RAGFlow ``User`` which only manages knowledge bases).
+    ``permission`` currently only carries ``read``. A document with no rows in
+    this table is readable by everyone (the pre-ACL behaviour); a document with
+    at least one row becomes restricted to the principals listed on those rows.
     """
 
     id = CharField(max_length=32, primary_key=True)
@@ -1368,8 +1369,27 @@ class DocumentACL(DataBaseModel):
         indexes = ((("document_id", "principal_type", "principal_id"), True),)
 
 
-class UserGroup(DataBaseModel):
-    """A named group of users within a tenant. Group principals for document ACL."""
+class AppUser(DataBaseModel):
+    """An application end-user, distinct from a RAGFlow ``User``.
+
+    RAGFlow ``User`` records manage knowledge bases; ``AppUser`` records are the
+    business principals used by document ACL. The owning external app maps its
+    own end-user identifier to an ``AppUser.id`` and passes it to retrieval via
+    the ``X-App-User-Id`` header.
+    """
+
+    id = CharField(max_length=32, primary_key=True)
+    tenant_id = CharField(max_length=32, null=False, index=True)
+    name = CharField(max_length=128, null=False, index=True)
+    email = CharField(max_length=255, null=True, index=True)
+    created_by = CharField(max_length=32, null=False, index=True)
+
+    class Meta:
+        db_table = "app_user"
+
+
+class AppUserGroup(DataBaseModel):
+    """A named group of app users within a tenant. Group principals for document ACL."""
 
     id = CharField(max_length=32, primary_key=True)
     tenant_id = CharField(max_length=32, null=False, index=True)
@@ -1377,18 +1397,18 @@ class UserGroup(DataBaseModel):
     created_by = CharField(max_length=32, null=False, index=True)
 
     class Meta:
-        db_table = "user_group"
+        db_table = "app_user_group"
 
 
-class UserGroupMember(DataBaseModel):
-    """Membership join between ``UserGroup`` and ``User``."""
+class AppUserGroupMember(DataBaseModel):
+    """Membership join between ``AppUserGroup`` and ``AppUser``."""
 
     id = CharField(max_length=32, primary_key=True)
     group_id = CharField(max_length=32, null=False, index=True)
     user_id = CharField(max_length=32, null=False, index=True)
 
     class Meta:
-        db_table = "user_group_member"
+        db_table = "app_user_group_member"
         indexes = ((("group_id", "user_id"), True),)
 
 

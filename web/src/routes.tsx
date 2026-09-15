@@ -83,6 +83,7 @@ export enum Routes {
   ChatShare = `${Chats}/share`,
   ChatWidget = `${Chats}/widget`,
   UserSetting = '/user-setting',
+  AccessControl = '/access-control',
   DataSetOverview = '/logs',
   DataSetSetting = '/configuration',
   DataflowResult = '/dataflow-result',
@@ -270,6 +271,10 @@ const routeConfigOptions = [
       {
         path: Routes.Skills,
         Component: () => import('@/pages/skills'),
+      },
+      {
+        path: Routes.AccessControl,
+        Component: () => import('@/pages/access-control'),
       },
       {
         path: Routes.UserSetting,

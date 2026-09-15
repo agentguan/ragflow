@@ -454,13 +454,27 @@ export const setDocumentPermission = (
   data: ISetDocumentPermissionRequestBody,
 ) => request.put(api.documentPermission(datasetId, documentId), { data });
 
-export const listGroups = () => request.get(api.groups);
+export const listAppUsers = () => request.get(api.appUsers);
 
-export const createGroup = (data: { name: string }) =>
-  request.post(api.groups, { data });
+export const createAppUser = (data: { name: string; email?: string }) =>
+  request.post(api.appUsers, { data });
 
-export const setGroupMembers = (groupId: string, userIds: string[]) =>
-  request.put(api.groupMembers(groupId), { data: { user_ids: userIds } });
+export const deleteAppUser = (userId: string) =>
+  request.delete(api.appUserDetail(userId));
+
+export const listAppGroups = () => request.get(api.appGroups);
+
+export const createAppGroup = (data: { name: string }) =>
+  request.post(api.appGroups, { data });
+
+export const deleteAppGroup = (groupId: string) =>
+  request.delete(api.appGroupDetail(groupId));
+
+export const getAppGroup = (groupId: string) =>
+  request.get(api.appGroupDetail(groupId));
+
+export const setAppGroupMembers = (groupId: string, userIds: string[]) =>
+  request.put(api.appGroupMembers(groupId), { data: { user_ids: userIds } });
 
 export const getMetaDataService = ({
   kb_id,

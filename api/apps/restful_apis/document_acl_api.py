@@ -16,10 +16,10 @@
 
 from api.apps import current_user, login_required
 from api.db.services.document_acl_service import (
+    AppUserGroupService,
+    AppUserService,
     DocumentAclPrincipalType,
     DocumentAclService,
-    UserGroupMemberService,
-    UserGroupService,
     can_manage_document,
 )
 from api.db.services.document_service import DocumentService
@@ -35,6 +35,10 @@ def _not_found_result(message="Not found."):
 
 def _permission_denied_result(message="You are not allowed to manage this document's permission."):
     return get_data_error_result(message=message, code=RetCode.PERMISSION_ERROR)
+
+
+def _serialize_app_user(u) -> dict:
+    return {"id": u.id, "tenant_id": u.tenant_id, "name": u.name, "email": u.email or "", "created_by": u.created_by}
 
 
 @manager.route("/datasets/<dataset_id>/documents/<document_id>/permission", methods=["GET"])  # noqa: F821
@@ -78,52 +82,86 @@ async def set_document_permission(dataset_id, document_id):
     return get_json_result(data={"document_id": document_id, "principals": DocumentAclService.list_principals(document_id)})
 
 
-@manager.route("/groups", methods=["GET"])  # noqa: F821
+@manager.route("/app-users", methods=["GET"])  # noqa: F821
 @login_required
-async def list_groups():
-    return get_json_result(data=UserGroupService.list_with_member_count(current_user.id))
+async def list_app_users():
+    users = list(AppUserService.query(tenant_id=current_user.id))
+    return get_json_result(data=[_serialize_app_user(u) for u in users])
 
 
-@manager.route("/groups", methods=["POST"])  # noqa: F821
+@manager.route("/app-users", methods=["POST"])  # noqa: F821
 @login_required
-async def create_group():
+async def create_app_user():
+    req = await get_request_json()
+    name = (req.get("name") or "").strip()
+    if not name:
+        return get_error_argument_result(message="`name` is required.")
+    email = (req.get("email") or "").strip() or None
+    user_id = get_uuid()
+    AppUserService.save(id=user_id, tenant_id=current_user.id, name=name, email=email, created_by=current_user.id)
+    return get_json_result(data={"id": user_id, "tenant_id": current_user.id, "name": name, "email": email or ""})
+
+
+@manager.route("/app-users/<user_id>", methods=["DELETE"])  # noqa: F821
+@login_required
+async def delete_app_user(user_id):
+    users = list(AppUserService.query(id=user_id, tenant_id=current_user.id))
+    if not users:
+        return _not_found_result(message="App user not found.")
+    DocumentAclService.delete_app_user(user_id)
+    return get_json_result(data=True)
+
+
+@manager.route("/app-groups", methods=["GET"])  # noqa: F821
+@login_required
+async def list_app_groups():
+    return get_json_result(data=DocumentAclService.list_groups(current_user.id))
+
+
+@manager.route("/app-groups", methods=["POST"])  # noqa: F821
+@login_required
+async def create_app_group():
     req = await get_request_json()
     name = (req.get("name") or "").strip()
     if not name:
         return get_error_argument_result(message="`name` is required.")
     group_id = get_uuid()
-    UserGroupService.save(id=group_id, tenant_id=current_user.id, name=name, created_by=current_user.id)
-    return get_json_result(data={"id": group_id, "tenant_id": current_user.id, "name": name})
+    AppUserGroupService.save(id=group_id, tenant_id=current_user.id, name=name, created_by=current_user.id)
+    return get_json_result(data={"id": group_id, "tenant_id": current_user.id, "name": name, "member_count": 0})
 
 
-@manager.route("/groups/<group_id>", methods=["GET"])  # noqa: F821
+@manager.route("/app-groups/<group_id>", methods=["GET"])  # noqa: F821
 @login_required
-async def get_group(group_id):
-    ok, group = UserGroupService.get_by_id(group_id)
-    if not ok or group.tenant_id != current_user.id:
-        return _not_found_result(message="Group not found.")
-    return get_json_result(data={"id": group.id, "name": group.name, "members": UserGroupMemberService.list_members(group_id)})
+async def get_app_group(group_id):
+    groups = list(DocumentAclService.list_groups(current_user.id))
+    group = next((g for g in groups if g["id"] == group_id), None)
+    if group is None:
+        return _not_found_result(message="App group not found.")
+    return get_json_result(data={**group, "members": DocumentAclService.list_members(group_id)})
 
 
-@manager.route("/groups/<group_id>/members", methods=["PUT"])  # noqa: F821
+@manager.route("/app-groups/<group_id>/members", methods=["PUT"])  # noqa: F821
 @login_required
-async def set_group_members(group_id):
-    ok, group = UserGroupService.get_by_id(group_id)
-    if not ok or group.tenant_id != current_user.id:
-        return _not_found_result(message="Group not found.")
+async def set_app_group_members(group_id):
+    groups = list(DocumentAclService.list_groups(current_user.id))
+    if not any(g["id"] == group_id for g in groups):
+        return _not_found_result(message="App group not found.")
     req = await get_request_json()
     user_ids = req.get("user_ids") or []
     if not isinstance(user_ids, list):
         return get_error_argument_result(message="`user_ids` must be a list.")
-    UserGroupMemberService.set_members(group_id, [str(u) for u in user_ids if u])
-    return get_json_result(data={"members": UserGroupMemberService.list_members(group_id)})
+    # Only accept app users that belong to this tenant.
+    valid_ids = {u.id for u in AppUserService.query(tenant_id=current_user.id)}
+    member_ids = [str(uid) for uid in user_ids if str(uid) in valid_ids]
+    DocumentAclService.set_members(group_id, member_ids)
+    return get_json_result(data={"members": DocumentAclService.list_members(group_id)})
 
 
-@manager.route("/groups/<group_id>", methods=["DELETE"])  # noqa: F821
+@manager.route("/app-groups/<group_id>", methods=["DELETE"])  # noqa: F821
 @login_required
-async def delete_group(group_id):
-    ok, group = UserGroupService.get_by_id(group_id)
-    if not ok or group.tenant_id != current_user.id:
-        return _not_found_result(message="Group not found.")
-    UserGroupService.delete_group(group_id)
+async def delete_app_group(group_id):
+    groups = list(DocumentAclService.list_groups(current_user.id))
+    if not any(g["id"] == group_id for g in groups):
+        return _not_found_result(message="App group not found.")
+    DocumentAclService.delete_app_group(group_id)
     return get_json_result(data=True)
