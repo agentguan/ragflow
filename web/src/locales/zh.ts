@@ -987,6 +987,10 @@ NER：使用 spaCy NER 和基于规则的关键词提取来抽取 Entities 和 R
       datasetUnavailable: '所选知识库不可用（已删除或无 chunk），请重新选择',
       knowledgeBasesTip:
         '选择关联的知识库。新建或空知识库不会在下拉菜单中显示。',
+      appUserId: 'App 用户身份（X-App-User-Id）',
+      appUserIdTip:
+        '可选。在聊天检索时注入 X-App-User-Id 请求头，用于测试文档级 ACL。留空则以管理员身份全量访问。',
+      appUserIdPlaceholder: '粘贴一个 AppUser 的 id 来测试 ACL',
       system: '系统提示词',
       systemPlaceholder: `你是一个智能助手，主要功能是基于提供的知识库严格回答问题。
 

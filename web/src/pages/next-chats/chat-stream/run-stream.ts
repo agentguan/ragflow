@@ -21,6 +21,7 @@ export type RunChatCompletionStreamParams = {
   enableThinking?: string;
   enableInternet?: boolean;
   llmSetting?: Variable;
+  appUserId?: string;
 };
 
 export type RunChatCompletionStreamResult = {
@@ -35,6 +36,7 @@ export async function runChatCompletionStream({
   enableThinking,
   enableInternet,
   llmSetting,
+  appUserId,
 }: RunChatCompletionStreamParams): Promise<RunChatCompletionStreamResult> {
   const { beginStream, applyAnswer, endStream } = useChatStreamStore.getState();
 
@@ -79,6 +81,7 @@ export async function runChatCompletionStream({
         enableThinking,
         enableInternet,
         llmSetting,
+        appUserId,
       },
       controller.signal,
     );

@@ -10,6 +10,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useTranslate } from '@/hooks/common-hooks';
 import { prefixName } from '@/utils/form';
@@ -78,6 +79,26 @@ export default function ChatBasicSetting({
       <KnowledgeBaseFormField
         name={prefixName(prefix, 'dataset_ids')}
       ></KnowledgeBaseFormField>
+
+      <FormField
+        control={form.control}
+        name={prefixName(prefix, 'prompt_config.app_user_id')}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel tooltip={t('appUserIdTip')}>
+              {t('appUserId')}
+            </FormLabel>
+            <FormControl>
+              <Input
+                {...field}
+                value={field.value ?? ''}
+                placeholder={t('appUserIdPlaceholder')}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </div>
   );
 }

@@ -1089,6 +1089,10 @@ This auto-tagging feature enhances retrieval by adding another layer of domain-s
         'The selected knowledge base is unavailable (deleted or has no chunks), please re-select',
       knowledgeBasesTip:
         'Select the datasets to associate with this chat assistant. An empty dataset will not appear in the dropdown list.',
+      appUserId: 'App user ID (X-App-User-Id)',
+      appUserIdTip:
+        'Optional. Injects the X-App-User-Id header on chat retrieval to test document-level ACL. Leave blank for full (admin) access.',
+      appUserIdPlaceholder: 'Paste an AppUser id to test ACL',
       system: 'System prompt',
       systemPlaceholder: `You are an intelligent assistant. Your primary function is to answer questions based strictly on the provided knowledge base.
 

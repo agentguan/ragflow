@@ -123,6 +123,7 @@ export const useSendMessage = () => {
         enableThinking,
         enableInternet,
         llmSetting: currentDialog?.llm_setting,
+        appUserId: currentDialog?.prompt_config?.app_user_id,
       });
 
       if (!ok && !aborted) {
@@ -141,6 +142,7 @@ export const useSendMessage = () => {
       failStream,
       t,
       currentDialog?.llm_setting,
+      currentDialog?.prompt_config?.app_user_id,
     ],
   );
 

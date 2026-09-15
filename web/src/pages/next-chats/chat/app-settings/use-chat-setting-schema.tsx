@@ -49,6 +49,7 @@ export function useChatSettingSchema() {
       .or(z.literal('')),
     reasoning: z.boolean().optional(),
     cross_languages: z.array(z.string()).optional(),
+    app_user_id: z.string().optional(),
     reference_metadata: z
       .object({
         include: z.boolean().optional(),

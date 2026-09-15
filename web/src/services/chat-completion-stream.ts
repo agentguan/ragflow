@@ -24,6 +24,7 @@ export type ChatCompletionStreamParams = {
   enableThinking?: string;
   enableInternet?: boolean;
   llmSetting?: Variable;
+  appUserId?: string;
 };
 
 export type CompletionChunk = {
@@ -47,6 +48,7 @@ export function requestChatCompletionStream(
     enableThinking,
     enableInternet,
     llmSetting,
+    appUserId,
   }: ChatCompletionStreamParams,
   signal: AbortSignal,
 ) {
@@ -65,6 +67,7 @@ export function requestChatCompletionStream(
     headers: {
       [Authorization]: getAuthorization(),
       'Content-Type': 'application/json',
+      ...(appUserId ? { 'X-App-User-Id': appUserId } : {}),
     },
     body: JSON.stringify({
       chat_id: chatId,

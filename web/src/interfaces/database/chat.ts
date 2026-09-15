@@ -26,6 +26,7 @@ export interface PromptConfig {
   youcom_api_key?: string;
   web_search_provider?: WebSearchProvider;
   toc_enhance?: boolean;
+  app_user_id?: string;
   reference_metadata?: {
     include?: boolean;
     fields?: string[];
