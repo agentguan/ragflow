@@ -81,3 +81,27 @@ export type IDocumentInfoFilter = {
   suffix: Record<string, number>;
   metadata: Record<string, Record<string, number>>;
 };
+
+export type DocumentAclPrincipalType = 'user' | 'group';
+
+export interface IDocumentAclPrincipal {
+  document_id: string;
+  principal_type: DocumentAclPrincipalType;
+  principal_id: string;
+  permission: 'read';
+  name: string;
+  email: string;
+}
+
+export interface IDocumentPermission {
+  document_id: string;
+  principals: IDocumentAclPrincipal[];
+}
+
+export interface IDocumentGroup {
+  id: string;
+  tenant_id: string;
+  name: string;
+  created_by: string;
+  member_count: number;
+}

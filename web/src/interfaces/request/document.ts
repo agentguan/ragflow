@@ -49,3 +49,10 @@ export interface IDocumentMetaRequestBody {
   documentId: string;
   meta: string; // json format string
 }
+
+export interface ISetDocumentPermissionRequestBody {
+  principals: Array<{
+    principal_type: 'user' | 'group';
+    principal_id: string;
+  }>;
+}

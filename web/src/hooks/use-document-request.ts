@@ -24,6 +24,8 @@ import { IChunk } from '@/interfaces/database/dataset';
 import {
   IDocumentInfo,
   IDocumentInfoFilter,
+  IDocumentGroup,
+  IDocumentPermission,
 } from '@/interfaces/database/document';
 import {
   IClaimsResponse,
@@ -32,6 +34,7 @@ import {
 import {
   IChangeParserConfigRequestBody,
   IDocumentMetaRequestBody,
+  ISetDocumentPermissionRequestBody,
 } from '@/interfaces/request/document';
 import i18n from '@/locales/config';
 import { EMPTY_METADATA_FIELD } from '@/pages/dataset/dataset/use-select-filters';
@@ -41,10 +44,15 @@ import kbService, {
   changeDocumentParser,
   changeDocumentsStatus,
   createDocument,
+  createGroup,
   deleteDocument,
   documentFilter,
+  getDocumentPermission,
   listDocument,
+  listGroups,
   renameDocument,
+  setDocumentPermission,
+  setGroupMembers,
   uploadDocument,
 } from '@/services/knowledge-service';
 import { restAPIv1 } from '@/utils/api';
@@ -74,7 +82,12 @@ import {
   useSetPaginationParams,
 } from './route-hook';
 import { KnowledgeApiAction } from './use-knowledge-request';
-import { DocumentApiAction, DocumentKeys } from './document-query-keys';
+import {
+  DocumentApiAction,
+  DocumentGroupKeys,
+  DocumentKeys,
+  DocumentPermissionKeys,
+} from './document-query-keys';
 
 export { DocumentApiAction, DocumentKeys } from './document-query-keys';
 
@@ -609,6 +622,106 @@ export const useSetDocumentParser = () => {
   });
 
   return { setDocumentParser: mutateAsync, data, loading };
+};
+
+export const useFetchDocumentPermission = (
+  datasetId?: string,
+  documentId?: string,
+) => {
+  const { data, isFetching: loading } = useQuery({
+    queryKey: DocumentPermissionKeys.permission(datasetId!, documentId!),
+    enabled: !!datasetId && !!documentId,
+    queryFn: async () => {
+      const { data } = await getDocumentPermission(datasetId!, documentId!);
+      return (data?.data ?? null) as IDocumentPermission | null;
+    },
+  });
+
+  return { data, loading };
+};
+
+export const useSetDocumentPermission = () => {
+  const queryClient = useQueryClient();
+
+  const {
+    data,
+    isPending: loading,
+    mutateAsync,
+  } = useMutation({
+    mutationKey: [DocumentApiAction.SetDocumentPermission],
+    mutationFn: async ({
+      datasetId,
+      documentId,
+      principals,
+    }: {
+      datasetId: string;
+      documentId: string;
+      principals: ISetDocumentPermissionRequestBody['principals'];
+    }) => {
+      const { data } = await setDocumentPermission(datasetId, documentId, {
+        principals,
+      });
+      if (data.code === 0) {
+        message.success(i18n.t('message.modified'));
+        queryClient.invalidateQueries({
+          queryKey: DocumentPermissionKeys.permission(datasetId, documentId),
+        });
+      }
+      return data.code;
+    },
+  });
+
+  return { setDocumentPermission: mutateAsync, loading, data };
+};
+
+export const useFetchDocumentGroups = () => {
+  const { data, isFetching: loading, refetch } = useQuery<IDocumentGroup[]>({
+    queryKey: DocumentGroupKeys.all(),
+    initialData: [],
+    gcTime: 0,
+    queryFn: async () => {
+      const { data } = await listGroups();
+      return data?.data ?? [];
+    },
+  });
+
+  return { data, loading, refetch };
+};
+
+export const useCreateDocumentGroup = () => {
+  const queryClient = useQueryClient();
+
+  const {
+    data,
+    isPending: loading,
+    mutateAsync,
+  } = useMutation({
+    mutationKey: [DocumentApiAction.CreateDocumentGroup],
+    mutationFn: async ({
+      name,
+      userIds,
+    }: {
+      name: string;
+      userIds: string[];
+    }) => {
+      const { data } = await createGroup({ name });
+      if (data.code !== 0) {
+        return { code: data.code, groupId: '' };
+      }
+      const groupId: string = data.data?.id;
+      if (userIds.length > 0) {
+        const ret = await setGroupMembers(groupId, userIds);
+        if (ret.data?.code !== 0) {
+          return { code: ret.data.code as number, groupId };
+        }
+      }
+      message.success(i18n.t('message.created'));
+      queryClient.invalidateQueries({ queryKey: DocumentGroupKeys.all() });
+      return { code: 0, groupId };
+    },
+  });
+
+  return { createGroup: mutateAsync, loading, data };
 };
 
 /**

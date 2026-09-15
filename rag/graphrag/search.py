@@ -27,6 +27,7 @@ from rag.graphrag.utils import get_entity_type2samples, get_llm_cache, set_llm_c
 from common.token_utils import num_tokens_from_string
 
 from rag.nlp.search import Dealer, index_name
+from common.document_acl import get_acl_denied_kb_ids
 from common.float_utils import get_float
 from common import settings
 from common.doc_store.doc_store_base import OrderByExpr
@@ -151,6 +152,29 @@ class KGSearch(Dealer):
         rel_sim_threshold: float = 0.3,
         **kwargs,
     ):
+        # Document-level ACL: knowledge-graph rows (entities/relations/community
+        # reports) are aggregated per knowledge base and carry no document
+        # provenance, so they cannot be filtered at document granularity. When
+        # the current user is denied any document inside a target KB, suppress the
+        # KB-wide graph summary rather than risking leakage of denied content.
+        denied_kb_ids = get_acl_denied_kb_ids()
+        if denied_kb_ids and any(kb_id in denied_kb_ids for kb_id in kb_ids):
+            return {
+                "chunk_id": get_uuid(),
+                "content_ltks": "",
+                "content_with_weight": "",
+                "doc_id": "",
+                "docnm_kwd": "Related content in Knowledge Graph",
+                "kb_id": kb_ids,
+                "important_kwd": [],
+                "image_id": "",
+                "similarity": 1.0,
+                "vector_similarity": 1.0,
+                "term_similarity": 0,
+                "vector": [],
+                "positions": [],
+            }
+
         qst = question
         filters = self.get_filters({"kb_ids": kb_ids})
         if isinstance(tenant_ids, str):

@@ -27,6 +27,10 @@ export const enum DocumentApiAction {
   CreateDocument = 'createDocument',
   FetchDocumentThumbnails = 'fetchDocumentThumbnails',
   ParseDocument = 'parseDocument',
+  FetchDocumentPermission = 'fetchDocumentPermission',
+  SetDocumentPermission = 'setDocumentPermission',
+  FetchDocumentGroups = 'fetchDocumentGroups',
+  CreateDocumentGroup = 'createDocumentGroup',
 }
 
 export const DocumentKeys = {
@@ -40,4 +44,13 @@ export const DocumentKeys = {
     [DocumentApiAction.FetchDocumentThumbnails, ids] as const,
   byIds: (ids: string[]) =>
     [DocumentApiAction.FetchDocumentList, 'byIds', ids] as const,
+};
+
+export const DocumentPermissionKeys = {
+  permission: (datasetId: string, documentId: string) =>
+    [DocumentApiAction.FetchDocumentPermission, datasetId, documentId] as const,
+};
+
+export const DocumentGroupKeys = {
+  all: () => [DocumentApiAction.FetchDocumentGroups] as const,
 };

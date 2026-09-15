@@ -31,6 +31,7 @@ from common.tag_feature_utils import parse_tag_features
 from common import settings
 
 from common.misc_utils import thread_pool_exec
+from common.document_acl import get_acl_denied_doc_ids
 
 
 def build_fusion_expr(topn: int, vector_similarity_weight: float = 0.3) -> FusionExpr:
@@ -703,6 +704,21 @@ class Dealer:
             raise Exception(f"rerank_candidates_count({rerank_candidates_count}) must be greater than page * page_size({page * page_size}) to ensure correct pagination.")
         if rerank_mdl is not None and page != 1:
             raise Exception(f"Pagination is not supported when rerank_mdl is specified. Please set page=1 to retrieve the top {page_size} results.")
+
+        # Document-level ACL enforcement. ``denied`` is request-scoped and
+        # computed by the API layer (``compute_denied_doc_ids``); empty/None
+        # means the caller is unauthenticated or no document is restricted, so
+        # retrieval keeps its original scope.
+        denied = get_acl_denied_doc_ids()
+        if denied:
+            if doc_ids:
+                doc_ids = [d for d in doc_ids if d not in denied]
+                if not doc_ids:
+                    ranks["doc_aggs"] = []
+                    return ranks
+            else:
+                must_not = dict(must_not or {})
+                must_not["doc_id"] = sorted(denied)
 
         rerank_candidates_page = 1
         req = {

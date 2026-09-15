@@ -358,6 +358,10 @@ class OSConnection(DocStoreConnection):
                     for kk, vv in v.items():
                         if kk == "exists":
                             bqry.must_not.append(Q("exists", field=vv))
+                        elif isinstance(vv, list):
+                            bqry.must_not.append(Q("terms", **{kk: vv}))
+                        elif isinstance(vv, str) or isinstance(vv, int):
+                            bqry.must_not.append(Q("term", **{kk: vv}))
                     continue
             if not v:
                 continue

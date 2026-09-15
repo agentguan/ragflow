@@ -23,10 +23,12 @@ import { ShowManageMetadataModalProps } from '../components/metedata/interface';
 import { DatasetActionCell } from './dataset-action-cell';
 import { ParseDropdownButton, ParsingStatusCell } from './parsing-status-cell';
 import { UseChangeDocumentParserShowType } from './use-change-document-parser';
+import { UseDocumentPermissionShowType } from './use-document-permission';
 import { UseRenameDocumentShowType } from './use-rename-document';
 
 type UseDatasetTableColumnsType = UseChangeDocumentParserShowType &
   UseRenameDocumentShowType &
+  UseDocumentPermissionShowType &
   Pick<UseRowSelectionType, 'setRowSelection'> & {
     showLog: (record: IDocumentInfo) => void;
     showManageMetadataModal: (config: ShowManageMetadataModalProps) => void;
@@ -35,6 +37,7 @@ type UseDatasetTableColumnsType = UseChangeDocumentParserShowType &
 export function useDatasetTableColumns({
   showChangeParserModal,
   showRenameModal,
+  showPermissionModal,
   showManageMetadataModal,
   showLog,
   setRowSelection,
@@ -246,6 +249,7 @@ export function useDatasetTableColumns({
             <DatasetActionCell
               record={record}
               showRenameModal={showRenameModal}
+              showPermissionModal={showPermissionModal}
               setRowSelection={setRowSelection}
             />
           );
@@ -259,6 +263,7 @@ export function useDatasetTableColumns({
       datasetId,
       showChangeParserModal,
       showRenameModal,
+      showPermissionModal,
       showManageMetadataModal,
       showLog,
       setRowSelection,

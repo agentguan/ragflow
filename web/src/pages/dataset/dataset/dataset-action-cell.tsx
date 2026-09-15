@@ -13,9 +13,10 @@ import { downloadDatasetDocument } from '@/services/file-manager-service';
 import { formatFileSize } from '@/utils/common-util';
 import { formatDate } from '@/utils/date';
 import { downloadFileFromBlob } from '@/utils/file-util';
-import { Download, Eye, PenLine, Trash2 } from 'lucide-react';
+import { Download, Eye, PenLine, ShieldCheck, Trash2 } from 'lucide-react';
 import { omit } from 'lodash';
 import { useCallback } from 'react';
+import { UseDocumentPermissionShowType } from './use-document-permission';
 import { UseRenameDocumentShowType } from './use-rename-document';
 import { isDocumentProcessing } from './utils';
 
@@ -30,8 +31,10 @@ const FunctionMap = {
 export function DatasetActionCell({
   record,
   showRenameModal,
+  showPermissionModal,
   setRowSelection,
 }: { record: IDocumentInfo } & UseRenameDocumentShowType &
+  UseDocumentPermissionShowType &
   Pick<UseRowSelectionType, 'setRowSelection'>) {
   const { id, type } = record;
   const isRunning = isDocumentProcessing(record);
@@ -67,6 +70,10 @@ export function DatasetActionCell({
     showRenameModal(record);
   }, [record, showRenameModal]);
 
+  const handlePermission = useCallback(() => {
+    showPermissionModal(record);
+  }, [record, showPermissionModal]);
+
   return (
     <div
       className="
@@ -80,6 +87,15 @@ export function DatasetActionCell({
         onClick={handleRename}
       >
         <PenLine className="size-[1em]" />
+      </Button>
+      <Button
+        size="icon-xs"
+        variant="ghost"
+        disabled={isRunning}
+        onClick={handlePermission}
+        data-testid="document-permission"
+      >
+        <ShieldCheck className="size-[1em]" />
       </Button>
       <HoverCard>
         <HoverCardTrigger>

@@ -1345,6 +1345,53 @@ class Document(DataBaseModel):
         db_table = "document"
 
 
+class DocumentACL(DataBaseModel):
+    """Per-document access control list entry.
+
+    ``principal_type`` is ``user`` or ``group``; ``principal_id`` references a
+    ``User.id`` or ``UserGroup.id`` respectively. ``permission`` currently only
+    carries ``read``. A document with no rows in this table is readable by
+    everyone (the pre-ACL behaviour); a document with at least one row becomes
+    restricted to the principals listed on those rows.
+    """
+
+    id = CharField(max_length=32, primary_key=True)
+    document_id = CharField(max_length=32, null=False, index=True)
+    principal_type = CharField(max_length=16, null=False, help_text="user|group", index=True)
+    principal_id = CharField(max_length=32, null=False, index=True)
+    permission = CharField(max_length=16, null=False, default="read", help_text="read", index=True)
+    tenant_id = CharField(max_length=32, null=False, index=True)
+    created_by = CharField(max_length=32, null=False, index=True)
+
+    class Meta:
+        db_table = "document_acl"
+        indexes = ((("document_id", "principal_type", "principal_id"), True),)
+
+
+class UserGroup(DataBaseModel):
+    """A named group of users within a tenant. Group principals for document ACL."""
+
+    id = CharField(max_length=32, primary_key=True)
+    tenant_id = CharField(max_length=32, null=False, index=True)
+    name = CharField(max_length=128, null=False, index=True)
+    created_by = CharField(max_length=32, null=False, index=True)
+
+    class Meta:
+        db_table = "user_group"
+
+
+class UserGroupMember(DataBaseModel):
+    """Membership join between ``UserGroup`` and ``User``."""
+
+    id = CharField(max_length=32, primary_key=True)
+    group_id = CharField(max_length=32, null=False, index=True)
+    user_id = CharField(max_length=32, null=False, index=True)
+
+    class Meta:
+        db_table = "user_group_member"
+        indexes = ((("group_id", "user_id"), True),)
+
+
 class File(DataBaseModel):
     id = CharField(max_length=32, primary_key=True)
     parent_id = CharField(max_length=32, null=False, help_text="parent folder id", index=True)

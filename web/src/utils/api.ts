@@ -291,6 +291,12 @@ export default {
   setMeta: `${webAPI}/document/set_meta`,
   getDatasetFilter: (datasetId: string) =>
     `${restAPIv1}/datasets/${datasetId}/documents?type=filter`,
+  // document permission (ACL)
+  documentPermission: (datasetId: string, documentId: string) =>
+    `${restAPIv1}/datasets/${datasetId}/documents/${documentId}/permission`,
+  groups: `${restAPIv1}/groups`,
+  groupDetail: (groupId: string) => `${restAPIv1}/groups/${groupId}`,
+  groupMembers: (groupId: string) => `${restAPIv1}/groups/${groupId}/members`,
 
   // chat
   createChat: `${restAPIv1}/chats`,

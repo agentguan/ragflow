@@ -220,6 +220,10 @@ class ESConnection(ESConnectionBase):
                     for kk, vv in v.items():
                         if kk == "exists":
                             bool_query.must_not.append(Q("exists", field=vv))
+                        elif isinstance(vv, list):
+                            bool_query.must_not.append(Q("terms", **{kk: vv}))
+                        elif isinstance(vv, str) or isinstance(vv, int):
+                            bool_query.must_not.append(Q("term", **{kk: vv}))
                     continue
             if not v:
                 continue

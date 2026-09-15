@@ -411,6 +411,16 @@ Example: A 1 KB message with 1024-dim embedding uses ~9 KB. The 5 MB default lim
         'Configure the model in the dataset Configuration page (Parser operator), then try again.',
       parseValidFiles: 'Parse valid files',
       parseValidFilesNote: '{{count}} valid files will be parsed.',
+      permissionManagement: 'Permission management',
+      permissionUsers: 'Users',
+      permissionGroups: 'Groups',
+      permissionCreateGroup: 'Create group',
+      permissionGroupName: 'Group name',
+      permissionGroupMembers: 'Members',
+      permissionAddGroup: 'Add group',
+      permissionUnavailable: 'Unavailable',
+      permissionEmptyHint:
+        'Leaving this empty keeps the document readable by everyone.',
       metadata: {
         fields: 'fields',
         selectFiles: 'Selected {{count}} files',

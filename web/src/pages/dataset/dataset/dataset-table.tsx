@@ -33,9 +33,11 @@ import { useMemo } from 'react';
 import { ShowManageMetadataModalProps } from '../components/metedata/interface';
 import ProcessLogModal from '../process-log-modal';
 import { ChangeParserDialog } from './change-parser-dialog';
+import { DocumentPermissionDialog } from './document-permission-dialog';
 import { useShowLog } from './hooks';
 import { useChangeDocumentParser } from './use-change-document-parser';
 import { useDatasetTableColumns } from './use-dataset-table-columns';
+import { useDocumentPermission } from './use-document-permission';
 import { useRenameDocument } from './use-rename-document';
 
 export type DatasetTableProps = Pick<
@@ -81,11 +83,22 @@ export function DatasetTable({
     initialName,
   } = useRenameDocument();
 
+  const {
+    permissionLoading,
+    onPermissionOk,
+    permissionVisible,
+    hidePermissionModal,
+    showPermissionModal,
+    permissionDocumentId,
+    permissionDatasetId,
+  } = useDocumentPermission();
+
   const { showLog, logInfo, logVisible, hideLog } = useShowLog(documents);
 
   const columns = useDatasetTableColumns({
     showChangeParserModal,
     showRenameModal,
+    showPermissionModal,
     showManageMetadataModal,
     showLog,
     setRowSelection,
@@ -206,6 +219,16 @@ export function DatasetTable({
           hideModal={hideRenameModal}
           initialName={initialName}
         ></RenameDialog>
+      )}
+
+      {permissionVisible && (
+        <DocumentPermissionDialog
+          datasetId={permissionDatasetId}
+          documentId={permissionDocumentId}
+          loading={permissionLoading}
+          hideModal={hidePermissionModal}
+          onOk={onPermissionOk}
+        />
       )}
 
       {logVisible && (

@@ -24,6 +24,7 @@ import {
   IFetchKnowledgeListRequestParams,
   IUpdateArtifactPageRequestBody,
 } from '@/interfaces/request/knowledge';
+import { ISetDocumentPermissionRequestBody } from '@/interfaces/request/document';
 import api from '@/utils/api';
 import nextRequest from '@/utils/next-request';
 import registerServer, { registerNextServer } from '@/utils/register-server';
@@ -441,6 +442,25 @@ export const changeDocumentParser = (
 
 export const deleteDocument = (datasetId: string, documentIds: string[]) =>
   request.delete(api.documentDelete(datasetId), { data: { ids: documentIds } });
+
+export const getDocumentPermission = (
+  datasetId: string,
+  documentId: string,
+) => request.get(api.documentPermission(datasetId, documentId));
+
+export const setDocumentPermission = (
+  datasetId: string,
+  documentId: string,
+  data: ISetDocumentPermissionRequestBody,
+) => request.put(api.documentPermission(datasetId, documentId), { data });
+
+export const listGroups = () => request.get(api.groups);
+
+export const createGroup = (data: { name: string }) =>
+  request.post(api.groups, { data });
+
+export const setGroupMembers = (groupId: string, userIds: string[]) =>
+  request.put(api.groupMembers(groupId), { data: { user_ids: userIds } });
 
 export const getMetaDataService = ({
   kb_id,
