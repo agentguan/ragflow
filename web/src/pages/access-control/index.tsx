@@ -25,6 +25,11 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   useCreateAppGroup,
   useCreateAppUser,
   useDeleteAppGroup,
@@ -34,9 +39,54 @@ import {
 } from '@/hooks/use-document-request';
 import { IAppUser, IAppUserGroup } from '@/interfaces/database/document';
 import { Plus, Trash2, Users } from 'lucide-react';
-import { ChangeEvent, useCallback, useState } from 'react';
+import { ChangeEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MembersDialog } from './members-dialog';
+
+const MAX_VISIBLE_GROUPS = 3;
+
+const groupChipClass =
+  'inline-flex items-center rounded-full border border-border-button bg-bg-base px-2 py-0.5 text-xs text-text-secondary';
+
+function UserGroupTags({ groups }: { groups: IAppUserGroup[] }) {
+  const { t } = useTranslation();
+
+  if (groups.length === 0) {
+    return (
+      <div className="mt-1.5 text-xs text-text-disabled">
+        {t('accessControl.noGroups')}
+      </div>
+    );
+  }
+
+  const visibleGroups = groups.slice(0, MAX_VISIBLE_GROUPS);
+  const hiddenGroups = groups.slice(MAX_VISIBLE_GROUPS);
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+      <span className="text-xs text-text-disabled">
+        {t('accessControl.userGroups')}
+      </span>
+      {visibleGroups.map((group) => (
+        <span key={group.id} className={groupChipClass}>
+          {group.name}
+        </span>
+      ))}
+      {hiddenGroups.length > 0 && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className={groupChipClass} tabIndex={0}>
+              +{hiddenGroups.length}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {hiddenGroups.map((group) => group.name).join(', ')}
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
 
 export default function AccessControlPage() {
   const { t } = useTranslation();
@@ -122,15 +172,30 @@ export default function AccessControlPage() {
 
   const closeMembers = useCallback(() => setEditingGroupId(null), []);
 
+  const userGroupMap = useMemo(() => {
+    const map = new Map<string, IAppUserGroup[]>();
+    for (const group of appGroups) {
+      for (const userId of group.member_ids ?? []) {
+        const groups = map.get(userId);
+        if (groups) {
+          groups.push(group);
+        } else {
+          map.set(userId, [group]);
+        }
+      }
+    }
+    return map;
+  }, [appGroups]);
+
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-6 py-8">
       <h1 className="mb-6 text-2xl font-semibold text-text-primary">
         {t('accessControl.title')}
       </h1>
 
-      <div className="space-y-8">
-        <section className="rounded-lg border border-border-button bg-bg-card p-5">
-          <div className="mb-4 flex items-center justify-between">
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <section className="flex flex-col overflow-hidden rounded-lg border border-border-button bg-bg-card">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border-button p-4">
             <h2 className="text-base font-medium text-text-primary">
               {t('accessControl.users')}
             </h2>
@@ -144,42 +209,51 @@ export default function AccessControlPage() {
             </Button>
           </div>
 
-          {appUsers.length === 0 ? (
-            <div className="py-4 text-sm text-text-secondary">
-              {t('accessControl.emptyUsers')}
-            </div>
-          ) : (
-            <ul className="divide-y divide-border-button">
-              {appUsers.map((u) => (
-                <li
-                  key={u.id}
-                  className="flex items-center justify-between py-3"
-                >
-                  <div>
-                    <div className="text-sm text-text-primary">{u.name}</div>
-                    {u.email ? (
-                      <div className="text-xs text-text-secondary">
-                        {u.email}
+          <div className="max-h-[60vh] overflow-y-auto p-4">
+            {appUsers.length === 0 ? (
+              <div className="py-4 text-sm text-text-secondary">
+                {t('accessControl.emptyUsers')}
+              </div>
+            ) : (
+              <ul className="divide-y divide-border-button">
+                {appUsers.map((u) => (
+                  <li
+                    key={u.id}
+                    className="flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-text-primary break-words">
+                        {u.name}
                       </div>
-                    ) : null}
-                  </div>
-                  <ConfirmDeleteDialog onOk={handleDeleteUser(u)}>
-                    <Button
-                      size="icon-xs"
-                      variant="ghost"
-                      aria-label={t('common.delete')}
-                    >
-                      <Trash2 className="size-[1em]" />
-                    </Button>
-                  </ConfirmDeleteDialog>
-                </li>
-              ))}
-            </ul>
-          )}
+                      {u.email ? (
+                        <div className="text-xs text-text-secondary break-words">
+                          {u.email}
+                        </div>
+                      ) : null}
+                      <UserGroupTags
+                        groups={userGroupMap.get(u.id) ?? []}
+                      />
+                    </div>
+                    <div className="shrink-0">
+                      <ConfirmDeleteDialog onOk={handleDeleteUser(u)}>
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={t('common.delete')}
+                        >
+                          <Trash2 className="size-[1em]" />
+                        </Button>
+                      </ConfirmDeleteDialog>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </section>
 
-        <section className="rounded-lg border border-border-button bg-bg-card p-5">
-          <div className="mb-4 flex items-center justify-between">
+        <section className="flex flex-col overflow-hidden rounded-lg border border-border-button bg-bg-card">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border-button p-4">
             <h2 className="text-base font-medium text-text-primary">
               {t('accessControl.groups')}
             </h2>
@@ -193,48 +267,52 @@ export default function AccessControlPage() {
             </Button>
           </div>
 
-          {appGroups.length === 0 ? (
-            <div className="py-4 text-sm text-text-secondary">
-              {t('accessControl.emptyGroups')}
-            </div>
-          ) : (
-            <ul className="divide-y divide-border-button">
-              {appGroups.map((g) => (
-                <li
-                  key={g.id}
-                  className="flex items-center justify-between py-3"
-                >
-                  <div>
-                    <div className="text-sm text-text-primary">{g.name}</div>
-                    <div className="text-xs text-text-secondary">
-                      {t('accessControl.memberCount', {
-                        count: g.member_count,
-                      })}
+          <div className="max-h-[60vh] overflow-y-auto p-4">
+            {appGroups.length === 0 ? (
+              <div className="py-4 text-sm text-text-secondary">
+                {t('accessControl.emptyGroups')}
+              </div>
+            ) : (
+              <ul className="divide-y divide-border-button">
+                {appGroups.map((g) => (
+                  <li
+                    key={g.id}
+                    className="flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-text-primary break-words">
+                        {g.name}
+                      </div>
+                      <div className="text-xs text-text-secondary">
+                        {t('accessControl.memberCount', {
+                          count: g.member_count,
+                        })}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="icon-xs"
-                      variant="ghost"
-                      aria-label={t('accessControl.manageMembers')}
-                      onClick={openMembers(g.id)}
-                    >
-                      <Users className="size-[1em]" />
-                    </Button>
-                    <ConfirmDeleteDialog onOk={handleDeleteGroup(g)}>
+                    <div className="flex shrink-0 items-center gap-1">
                       <Button
                         size="icon-xs"
                         variant="ghost"
-                        aria-label={t('common.delete')}
+                        aria-label={t('accessControl.manageMembers')}
+                        onClick={openMembers(g.id)}
                       >
-                        <Trash2 className="size-[1em]" />
+                        <Users className="size-[1em]" />
                       </Button>
-                    </ConfirmDeleteDialog>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+                      <ConfirmDeleteDialog onOk={handleDeleteGroup(g)}>
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={t('common.delete')}
+                        >
+                          <Trash2 className="size-[1em]" />
+                        </Button>
+                      </ConfirmDeleteDialog>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </section>
       </div>
 

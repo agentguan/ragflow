@@ -150,6 +150,8 @@ export default {
       members: 'Members',
       manageMembers: 'Manage members',
       memberCount: '{{count}} members',
+      userGroups: 'User groups',
+      noGroups: 'Not in any group',
       emptyUsers: 'No app users yet.',
       emptyGroups: 'No app groups yet.',
     },

@@ -112,6 +112,7 @@ export interface IAppUserGroup {
   name: string;
   created_by: string;
   member_count: number;
+  member_ids?: string[];
 }
 
 export interface IAppUserGroupMember {

@@ -136,17 +136,19 @@ class DocumentAclService(CommonService):
     @classmethod
     @DB.connection_context()
     def list_groups(cls, tenant_id: str) -> list[dict]:
-        """List app-user groups of a tenant enriched with member count."""
+        """List app-user groups of a tenant enriched with member count and member user ids."""
         groups = list(AppUserGroupService.query(tenant_id=tenant_id))
         member_counts: dict[str, int] = {}
+        member_ids: dict[str, list[str]] = {}
         if groups:
             rows = list(
-                AppUserGroupMember.select(AppUserGroupMember.group_id).where(
-                    AppUserGroupMember.group_id.in_([g.id for g in groups])
-                )
+                AppUserGroupMember.select(
+                    AppUserGroupMember.group_id, AppUserGroupMember.user_id
+                ).where(AppUserGroupMember.group_id.in_([g.id for g in groups]))
             )
             for row in rows:
                 member_counts[row.group_id] = member_counts.get(row.group_id, 0) + 1
+                member_ids.setdefault(row.group_id, []).append(row.user_id)
         return [
             {
                 "id": g.id,
@@ -154,6 +156,7 @@ class DocumentAclService(CommonService):
                 "name": g.name,
                 "created_by": g.created_by,
                 "member_count": member_counts.get(g.id, 0),
+                "member_ids": member_ids.get(g.id, []),
             }
             for g in groups
         ]

@@ -132,6 +132,8 @@ export default {
       members: '成员',
       manageMembers: '管理成员',
       memberCount: '{{count}} 名成员',
+      userGroups: '所属用户组',
+      noGroups: '未加入用户组',
       emptyUsers: '暂无用户。',
       emptyGroups: '暂无用户组。',
     },
